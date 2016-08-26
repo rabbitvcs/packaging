@@ -1,0 +1,13 @@
+[rabbitvcs]
+fqdn = ppa.launchpad.net
+method = ftp
+incoming = ~rabbitvcs/ppa/ubuntu/
+login = anonymous
+allow_unsigned_uploads = 0
+
+[rabbitvcs-testing]
+fqdn = ppa.launchpad.net
+method = ftp
+incoming = ~rabbitvcs/rabbitvcs-testing/ubuntu/
+login = anonymous
+allow_unsigned_uploads = 0

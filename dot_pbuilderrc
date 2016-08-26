@@ -1,0 +1,98 @@
+# Pbuilder configuration file for building Debian and Ubuntu packages in a clean
+# environment. 
+
+# Other options
+REMOVEPACKAGES=lilo
+DEBOOTSTRAPOPTS=('--variant=buildd' '--keyring=/usr/share/keyrings/ubuntu-archive-keyring.gpg' '--keyring=/usr/share/keyrings/debian-archive-keyring.gpg' '--keyring=/usr/share/keyrings/ubuntu-master-keyring.gpg' '--keyring=/etc/apt/trusted.gpg')
+
+# These flags sometimes solve problems when you're building on other distros.
+# DEBOOTSTRAPOPTS=('--variant=buildd' '--keyring=/usr/share/keyrings/debian-archive-keyring.gpg')
+BUILDSOURCEROOTCMD=fakeroot
+AUTO_DEBSIGN=no
+DEBOOTSTRAP=debootstrap
+
+# Codenames for Debian suites according to their alias. Update these when
+# needed.
+UNSTABLE_CODENAME="sid"
+TESTING_CODENAME="stretch"
+STABLE_CODENAME="jessie"
+
+# List of Debian suites.
+DEBIAN_SUITES=($UNSTABLE_CODENAME $TESTING_CODENAME $STABLE_CODENAME
+    "unstable" "testing" "stable")
+
+# List of Ubuntu suites. Update these when needed.
+UBUNTU_SUITES=("xenial" "wily" "vivid" "utopic" "trusty" "saucy" "raring" "quantal" "precise" "oneiric" "natty" "maverick" "lucid" "karmic" "jaunty" "intrepid" "hardy" "gutsy")
+
+# Mirrors to use. Update these to your preferred mirror.
+DEBIAN_MIRROR="httpredir.debian.org"
+UBUNTU_MIRROR="archive.ubuntu.com"
+
+# Useful for eg. propagating apt-cacher-ng usage within pbuilder runs.
+# export http_proxy="http://your.apt.cache:3142/"
+
+# Optionally use the changelog of a package to determine the suite to use if
+# none set.
+if [ -z "${DIST}" ] && [ -r "debian/changelog" ]; then
+    DIST=$(dpkg-parsechangelog | awk '/^Distribution: / {print $2}')
+    # Use the unstable suite for Debian experimental packages.
+    if [ "${DIST}" == "experimental" ]; then
+        DIST="unstable"
+    fi
+fi
+
+# Optionally set a default distribution if none is used. Note that you can set
+# your own default (i.e. ${DIST:="unstable"}).
+# : ${DIST:="$(lsb_release --short --codename)"}
+: ${DIST:="sid"}
+
+# Optionally change Debian release states in $DIST to their names.
+case "$DIST" in
+    unstable)
+        DIST="$UNSTABLE_CODENAME"
+        ;;
+    testing)
+        DIST="$TESTING_CODENAME"
+        ;;
+    stable)
+        DIST="$STABLE_CODENAME"
+        ;;
+esac
+
+# Optionally set the architecture to the host architecture if none set. Note
+# that you can set your own default (i.e. ${ARCH:="i386"}).
+#: ${ARCH:="$(dpkg --print-architecture)"}
+
+NAME="$DIST"
+if [ -n "${ARCH}" ]; then
+    NAME="$NAME-$ARCH"
+    DEBOOTSTRAPOPTS=("--arch" "$ARCH" "${DEBOOTSTRAPOPTS[@]}")
+fi
+
+if [ -n "${SPECIAL}" ]; then
+    NAME="${NAME}-${SPECIAL}"
+fi
+
+BASEDIR="$HOME/pbuilder"
+HOOKDIR="${BASEDIR}/pbuilder-hooks/"
+BASETGZ="$BASEDIR/$NAME-base.tgz"
+DISTRIBUTION="$DIST"
+BUILDRESULT="$BASEDIR/$NAME/result/"
+APTCACHE="$BASEDIR/$NAME/aptcache/"
+BUILDPLACE="$BASEDIR/build-$NAME/"
+
+if $(echo ${DEBIAN_SUITES[@]} | grep -q $DIST); then
+    # Debian configuration
+    MIRRORSITE="http://$DEBIAN_MIRROR/debian/"
+    # COMPONENTS="main contrib non-free"
+	COMPONENTS="main"
+elif $(echo ${UBUNTU_SUITES[@]} | grep -q $DIST); then
+    # Ubuntu configuration
+    MIRRORSITE="http://$UBUNTU_MIRROR/ubuntu/"
+    COMPONENTS="main restricted universe multiverse"
+    OTHERMIRROR="$OTHERMIRROR | deb http://$UBUNTU_MIRROR/ubuntu $DIST-backports $COMPONENTS"
+	# COMPONENTS="main"
+else
+    echo "Unknown distribution: $DIST"
+    exit 1
+fi
